@@ -1,0 +1,8 @@
+base
+BiocInstaller
+BiocGenerics
+S4Vectors
+IRanges
+GenomeInfoDb
+GenomicRanges
+ggplot2

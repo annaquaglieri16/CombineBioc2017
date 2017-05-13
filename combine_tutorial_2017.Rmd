@@ -1,0 +1,477 @@
+---
+title: "Combine_tutorial"
+author: "Anna Qualieri"
+date: "7 May 2017"
+output:
+  html_document:
+    toc: yes
+    toc_depth: '4'
+  pdf_document:
+    fig_caption: yes
+    fig_height: 6
+    fig_width: 7
+    highlight: tango
+    number_sections: yes
+    toc: yes
+    toc_depth: 4
+---
+
+# **GenomicRanges**: **Granges** and **GRangesList**
+
+```{r echo = FALSE}
+# Chunk options
+knitr::opts_chunk$set(fig.width=8, fig.height=6, echo=T, warning=FALSE, message=FALSE,prompt=T,tidy=T,include=TRUE,cache=FALSE)
+
+dir <- "~/Documents/varie/Combine_tutorial"
+
+```
+
+Let's start by loading the [GenomicRanges](http://bioconductor.org/packages/release/bioc/html/GenomicRanges.html) package via *biocLite*:
+
+```{r eval = FALSE, results='hide'}
+source("https://bioconductor.org/biocLite.R")
+biocLite("GenomicRanges")
+# biocLite("rtracklayer")
+biocLite("Rsamtools")
+```
+
+Load the packages necessary for this analysis into R. You can use the *install.packages(package = "mypackage")* for every CRAN package below than is not already installed in your R session or *biocLite* for *Bioconductor* packages.
+
+
+```{r}
+library(GenomicRanges)
+library(Rsamtools)
+# library(rtracklayer)
+library(ggplot2)
+library(png)
+library(grid)
+
+```
+
+## *GRanges*
+
+Now that we are familiar with the basic structure and functionality of *GRanges* objects we are going to explore other ways of manipulating their information as well as ways to compare different *GRanges* objects. 
+
+Imagine you have done a ChIP-Seq experiment on *Sample 1* and your output is a set of ranges. Let's start by manually creating this very simple *GRanges* objects with regions only on *chr1* and *chr2*. 
+
+```{r}
+# Sample 1
+gr_S1 <- GRanges(
+seqnames = Rle(c("chr1", "chr2"), c(3, 2)),   
+ranges = IRanges(start = c(5,8,20,8,18), 
+                 end = c(11,15,26,16,21), 
+                 names = c(paste("Peak_",1:5,sep = ""))), 
+strand = Rle(strand(c("*")), c(5)),
+peak_coverage = rbinom(n = 5,size = 10, prob = 0.6)) 
+
+gr_S1
+```
+
+A very common analysis to perform is to evaluate to what extent and where your ChIP-Seq peaks overlap with some **features**, such as genes, exons, other ChIP-Seq peaks, etc...
+As an example we create a simple gene annotation to use with the ranges created above.
+
+```{r}
+# Gene annotation
+genes <- GRanges(
+seqnames = Rle(c("chr1", "chr2"), c(2, 2)),  
+ranges = IRanges(start = c(7,17,7,23), 
+                 end = c(15,23,14,26), 
+                 names = c(paste("Gene_",1:4,sep = ""))), 
+strand = Rle(strand(c("+","+")), c(2,2)))
+
+genes
+```
+
+Figure \ref{fig:fig1} is a simple way of plotting ranges stored into *Granges* object using  *geom_rect* from *ggplot2*. Even though there are available more advanced ways of plotting genomic data, this simple strategy is sufficient for the purpose of this tutorial. This is an example of how any *GRanges* object can be converted to a *data.frame* via *data.frame(myGranges)*. 
+
+```{r fig1 , fig.cap = "\\label{fig:fig1}Graphic representation of the GRanges objects created above."}
+gr <- data.frame(rbind(data.frame(gr_S1), cbind(data.frame(genes), peak_coverage = 5)))
+gr$rangeID <- c(names(gr_S1),names(genes))
+gr$Sample <- c(rep("Peaks",length(gr_S1)), rep("Genes",length(genes)))
+ggplot(data = gr, aes(xmin = start, xmax = end, ymin = 0, ymax = peak_coverage)) + 
+  geom_rect( aes(fill = rangeID),alpha = 0.4) + facet_wrap(~ Sample + seqnames)
+```
+
+\clearpage
+
+## Find overlaps between two *GRanges* objects
+
+From Figure \ref{fig:fig1} one notices that the two ranges in *chr1* from *Sample 1* are overlapping. This happens in ChIP-Seq experiments for example when there is a very broad peak and several peaks are called in place of one. Usually, it is helpful to simplify these situations with the aim of reducing a *GRanges* object to its minimal set of ranges, merging all such overlapping regions. This can be easily achieved with the *reduce()* function:
+
+```{r}
+gr_S1_reduced <- reduce(gr_S1)
+gr_S1_reduced
+length(gr_S1)
+length(gr_S1_reduced)
+```
+
+One can also decide to keep every range distinct and evaluate the overlap for each of them. For this analysis we will keep the overlapping ranges as disticnt regions.
+
+### *findOverlaps()*
+
+Now, *findOverlaps()* can be used to detect overlap between the ChIP-Seq ranges and the gene annotation. *findOverlap()* by default looks for overlaps starting from 1bp between a *query* and a *subject* and it does not allow any gap between the overlapping ranges (arguments *minoverlap* and *maxgap* are 1 and 0 respectively by default).
+
+```{r}
+overlaps <- findOverlaps(gr_S1,genes)
+overlaps
+```
+
+Below is an example of what happens if we change the *maxgap* argument to 5, allowing 5bp to be present between ranges:
+
+```{r}
+overlaps <- findOverlaps(gr_S1,genes, maxgap = 5)
+overlaps
+```
+
+### *countOverlaps()*
+
+The example used here is very simple and it straightforward to see how many ranges are overlapping with genes and viceversa. However, for more complex experiments the *countOverlaps()* function is a very useful tool to get a quick summary of the overlaps for every range.
+
+```{r}
+N_overlaps <- countOverlaps(gr_S1,genes)
+N_overlaps
+```
+
+## Nearest-methods in *GenomicRanges*
+
+### *nearest()*
+
+Will return a vector of indeces referring to the nearest neighbour *subject* for every range in *x*.
+
+By default if one range overlaps with multiple genes then one overlap will be chosen at random:
+
+```{r}
+GenomicRanges::nearest(x = gr_S1, subject = genes)
+```
+
+Using *select = "all"* all overlaps will be return:
+
+```{r}
+GenomicRanges::nearest(x = gr_S1,subject = genes, select = "all")
+```
+
+You can also look for the nearest-neighbours within a single set of ranges:
+
+```{r}
+GenomicRanges::nearest(gr_S1)
+```
+
+### *distance()*
+
+```{r}
+GenomicRanges::distance(x = gr_S1[1],y = genes)
+GenomicRanges::distance(x = gr_S1[1:4],y = genes)
+GenomicRanges::distance(x = gr_S1, y = genes)
+```
+
+*distance()* is a symmetric function which means that it requires x and y to have to have the same lenght and if one is shorter than the other one it will be recycled to match the length of the longest. Also, the distance between two consecutive blocks is 0 not 1 which affects the notion of overlaps. If distance(x, y) == 0 then x and y can be either adjacent or overlapping ranges.
+For more information about the *distance()* function see ?IRanges::distance. 
+
+### *distanceToNearest()*
+
+For every range in *x* it will return the index and the distance to its nearest neighbour in *subject*.
+
+```{r}
+GenomicRanges::distanceToNearest(x = gr_S1, subject = genes)
+```
+
+\clearpage
+
+## *GRangesList*
+
+*GRangesList* are lists of *GRanges* objects. In some instances it makes sense to store several set of ranges under a common parent. For example, when you call peaks on several technical replicates from a ChIP-Seq experiments and you want to store their output in one object. Anotehr example is when you would like to store different transcripts from the same gene under a common object. Below, this concept is illustrated with a simple example: 
+
+
+```{r}
+# Sample 1
+gr_S1 <- GRanges(
+seqnames = Rle(c("chr1", "chr2"), c(3, 2)),   
+ranges = IRanges(start = c(5,8,20,8,18), 
+                 end = c(11,15,26,16,21), 
+                 names = c(paste("Peak_",1:5,sep = ""))), 
+strand = Rle(strand(c("*")), c(5)),
+peak_coverage = rbinom(n = 5,size = 10, prob = 0.6)) 
+
+gr_S1
+
+# Sample 2
+gr_S2 <- GRanges(
+seqnames = Rle(c("chr2", "chr3"), c(3, 5)),   
+ranges = IRanges(start = c(1:8), 
+                 width = 10, 
+                 names = c(paste("Peak_",1:8,sep = ""))), 
+strand = Rle(strand(c("*")), c(8)),
+peak_coverage = rbinom(n = 8,size = 10, prob = 0.6)) 
+
+gr_S2
+
+# GRanges List
+
+list_ranges <- GRangesList(Sample1 = gr_S1, Sample2 = gr_S2)
+
+```
+
+Many of the functions learnt for *GRanges* can also be applied to *GRangesList* objects even though the output will have to be interepreted accordingly:
+
+```{r}
+names(list_ranges)
+length(list_ranges)
+seqnames(list_ranges)
+strand(list_ranges)
+ranges(list_ranges)
+start(list_ranges)
+end(list_ranges)
+width(list_ranges)
+```
+
+To get the number of ranges in every object of the list use *elementNROWS*:
+
+```{r}
+elementNROWS(list_ranges) 
+```
+
+It is also possible to quickly combine all the element of a *GRangesList* into one *GRanges* object:
+
+```{r}
+list_to_granges <- unlist(list_ranges)
+list_to_granges
+```
+
+To append two *GRanges* lists simply use the R concatenate command *c*:
+
+```{r}
+# Sample 3
+gr_S3 <- GRanges(
+seqnames = Rle(c("chr1", "chr2"), c(3, 2)),   
+ranges = IRanges(start = 20:24, 
+                 width = 8, 
+                 names = c(paste("Peak_",1:5,sep = ""))), 
+strand = Rle(strand(c("*")), c(5)),
+peak_coverage = rbinom(n = 5,size = 10, prob = 0.6)) 
+
+gr_S1
+
+# Sample 4
+gr_S4 <- GRanges(
+seqnames = Rle(c("chr2", "chr3"), c(3, 5)),   
+ranges = IRanges(start = 20:27, 
+                 width = 10, 
+                 names = c(paste("Peak_",1:8,sep = ""))), 
+strand = Rle(strand(c("*")), c(8)),
+peak_coverage = rbinom(n = 8,size = 10, prob = 0.6)) 
+
+gr_S4
+
+# Second GRanges List
+list_ranges2 <- GRangesList(Sample3 = gr_S3, Sample4 = gr_S4)
+```
+
+
+```{r}
+append_lists <- c(list_ranges,list_ranges2)
+head(append_lists)
+```
+
+### Subsetting and looping over *GRanges* list
+
+In many cases *GRanges* objects can be subsetted using the same rules that apply to normal lists or as sort of data frames in the following way:
+
+```{r}
+# As a lit
+list_ranges[[1]]
+list_ranges["Sample1"]
+# As a data.frame object
+list_ranges[1,"peak_coverage"]
+list_ranges["Sample1","peak_coverage"]
+```
+
+At the same time it is possible to apply the general R function *lapply* and *sapply* in the same way as one would do for list objects:
+
+```{r}
+lapply(list_ranges, length)
+sapply(list_ranges, length)
+lapply(list_ranges, start)
+```
+
+
+```{r}
+Reduce(c,list_ranges)
+```
+
+Similar considerations apply for the other functions explored above like *findOverlaps()*, *countOverlaps()*, etc...
+
+
+\clarepage
+
+# *Rsamtools*
+
+- find small bamfile that I can use as example
+- read in Bamfiles
+
+```{r}
+library(Rsamtools)
+which <- RangesList(seq1=IRanges(1000, 2000),
+seq2=IRanges(c(100, 1000), c(1000, 2000)))
+what <- c("rname", "strand", "pos", "qwidth", "seq")
+param <- ScanBamParam(which=which, what=what)
+bamFile <- system.file("extdata", "ex1.bam", package="Rsamtools")
+bam <- scanBam(bamFile, param=param)
+
+
+```
+
+\clearpage
+
+# *Rtracklayer*
+
+Now that the structure and manipulation of *GRanges* objects is clear, the *rtracklayer* package comes as a useful tool to import/export *GRanges* objects from and to different data formats commonly used in genomic analyses. *Rtracklayer* stands as an interface to mediate the crosstalk between R and genome browsers (UCSC built-in). Example of data files supported by this package are BED, bigWIG, wig, gff and gtf formats.
+
+Another very important function of this package is to allow the visualisations of genomic annotation *tracks*. However, this part will not covered in the present tutorial. For more references see the [Rtracklayer Bioconductor page](http://bioconductor.org/packages/release/bioc/html/rtracklayer.html).
+
+## Data formats
+
+There is a very large number of different data formats used to store different sort of genomic data. In this tutororial only few of them will be covered as example. However, the UCSC genome growser offers a useful [FAQ page](https://genome.ucsc.edu/FAQ/FAQformat.html) where one can find the specification of all mandatory and optional fields for every data format.
+
+## GTF and GFF Import/Export
+
+The **GFF** and **GTF** are the preferred format used to store annotations and their exact specification is summarised in Figure\ref{fig:fig2} and \ref{fig:fig3}, taken from the UCSC browser.
+
+```{r echo = FALSE, fig.cap = "\\label{fig:fig2}GFF and GTF format specification from the UCSC genome browser."}
+
+img <- readPNG(file.path(dir,"GFF.png"))
+grid.raster(img)
+```
+
+```{r fig.cap = "\\label{fig:fig3}GFF and GTF format specification from the UCSC genome browser.", echo = FALSE}
+img <- readPNG(file.path(dir,"GTF.png"))
+grid.raster(img)
+```
+
+The function *rtracklayer::import()* is used to import all the supported data types into a *GRanges* object in R. The function recognises the format from the extension of the file but the argument *format* can be used to expliciclty define it. The function *rtracklayer::export()* works in the same way and it is used to export *GRanges* objects to files.
+
+To check how to specify the file formats supported by the *import()* and *export()* functions, simply look up their help page `r ?rtracklayer::export`.
+
+Following we import a gtf file containing the top 200 genes from hg38 UCSC gene annotation:
+
+```{r eval = FALSE}
+# Import
+#gtf_path <- file.path(dir,"homo_sapiens_UCSC_hg38_200.gtf")
+gtf_path <- file.path("~/homo_sapiens_UCSC_hg38_200.gtf")
+gff_hg38_import <- rtracklayer::import(con = gtf_path)
+class(gff_hg38_import)
+gff_hg38_import
+
+# Export
+gtf_path <- file.path("~/homo_sapiens_UCSC_hg38_200_export.gtf")
+rtracklayer::export(object = gff_hg38_import, con = gtf_path)
+
+```
+
+## Challenge!
+
+1. Create a simple *GRanges* object made out of 20 ranges and export it as a *gff* file. 
+2. Read the file back into R.
+3. Print the number of rows of the *GRanges* object just imported and create a histogram of the widths of the ranges.
+
+\clearpge
+
+# Wiggle (WIG) and bigWIG file formats for graphing tracks
+
+The [WIG](http://www.ensembl.org/info/website/upload/wig.html#tracklines) data format is used for the disply of dense continuous data, like scores. Every line in the file is an intervals and *WIG* files only allow equally spaced intervals. For intervals of variable width one should use the [bedGraph](http://www.ensembl.org/info/website/upload/bed.html#bedGraph) format. 
+There are two main data formats: the *variableStep* and the *fixedStep*. The *WIG* file is constituted by one or more blocks separated by declaration lines. Let's go through them with two examples.
+
+
+## variableStep
+
+The following example is a *WIG* file with only one block of coordinates. The field *chrom* is required.
+
+```{bash eval = FALSE, prompt = FALSE}
+variableStep chrom=chr2
+300701  12.5
+300702  12.5
+300703  12.5
+300704  12.5
+300705  12.5
+```
+
+The same file can be defined as follows using the *span* argument.
+
+```{bash eval = FALSE, prompt = FALSE}
+variableStep chrom=chr2 span=5
+300701  12.5
+```
+
+## fixedStep
+
+This format allows a more compact way of storing intervals. In this situation the *span* would not change the dimension of the file.
+
+```{bash eval = FALSE, prompt = FALSE}
+fixedStep chrom=chr3 start=400601 step=100
+11
+22
+33
+```
+
+The [bigWig](https://genome.ucsc.edu/goldenpath/help/wiggle.html) file is created from a *WIG* file using a the *rtracklayer* function *wigToBigWig()*. It is the recommended format for very large data tracks due to the way in which data are compressed and stored in an indexed binary format. Usually whole-genome coverage vectors are stored as *bigWig*. Due to its compression there can be a minor loss in precision when the data are exported to other non binary format like the [bedGraph](https://genome.ucsc.edu/goldenpath/help/bedgraph.html). Howver, the loss is negligible when dealing with very large amount of data. 
+
+```{r eval=FALSE}
+# wig_path <- file.path(dir,"exampleWIG.wig")
+wig_path <- file.path("~/exampleWIG.wig",genome = "hg19")
+
+import_wig <- rtracklayer::import(con = wig_path)
+```
+
+
+## bigWig Challenge 
+
+1. Convert the *WIG* file into a *bigWig* file and import the *bigWig* file into R. 
+
+```{r eval = FALSE}
+# bigwig_path <- file.path(dir,"example_wigToBigWig.bw")
+bigwig_path <- file.path("~/example_wigToBigWig.bw")
+
+rtracklayer::wigToBigWig(wig_path, dest = bigwig_path, seqinfo = seqinfo(import_wig))
+import_bigwig <- rtracklayer::import(con = bigwig_path)
+
+```
+
+## Import only a region of the bigWig file
+
+The *import* functions allows to load into a R only a specific regions defined using a *GRanges* object.
+
+```{r eval = FALSE}
+which_region <- GRanges(seqnames = "chr3", IRanges(start = 1, end = 500000))
+import_bigwig_region <- rtracklayer::import(con = bigwig_path, which = which_region)
+```
+
+## Show an example on how to display the track on the genomeBrowser
+
+# lifOver from different genome releases
+
+```{r eval = FALSE}
+library(AnnotationHub)
+ahub <- AnnotationHub()
+names(ahub)
+
+import_bigwig <- rtracklayer::import(con = bigwig_path)
+
+ahub.chain <- subset(ahub, rdataclass == "ChainFile" & species == "Homo sapiens")
+query(ahub.chain, c("hg18", "hg19"))
+
+chain <- ahub.chain[ahub.chain$title == "hg19ToHg18.over.chain.gz"]
+chain <- chain[[1]]
+gr.hg18 <- rtracklayer::liftOver(import_bigwig, chain)
+gr.hg18
+
+```
+
+\clearpage
+
+# Rsamtools
+
+
+
+
+
+
+
