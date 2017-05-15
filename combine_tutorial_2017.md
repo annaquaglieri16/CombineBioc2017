@@ -8,10 +8,15 @@ Anna Qualieri
 -   [Load packages](#load-packages)
 -   [Advanced `GenomicRanges`](#advanced-genomicranges)
     -   [Overlaps between two `GRanges` objects](#overlaps-between-two-granges-objects)
+        -   [`findOverlaps()`](#findoverlaps)
+        -   [`countOverlaps()`](#countoverlaps)
     -   [Nearest-methods in `GenomicRanges`](#nearest-methods-in-genomicranges)
+        -   [`nearest()`](#nearest)
+        -   [`distance()`](#distance)
+        -   [`distanceToNearest()`](#distancetonearest)
     -   [`GRangesList`](#grangeslist)
     -   [Subsetting and looping over *GRanges* list](#subsetting-and-looping-over-granges-list)
-        -   [&gt; Challenge](#challenge)
+        -   [Challenge](#challenge)
         -   [Solutions](#solutions)
 -   [`Rtracklayer`](#rtracklayer)
     -   [GTF and GFF](#gtf-and-gff)
@@ -19,7 +24,7 @@ Anna Qualieri
         -   [Solution](#solution)
     -   [Wiggle (WIG) and bigWIG file formats for graphing tracks](#wiggle-wig-and-bigwig-file-formats-for-graphing-tracks)
     -   [`import` only a region of the bigWig file](#import-only-a-region-of-the-bigwig-file)
--   [`lifOver` from different genome releases](#lifover-from-different-genome-releases)
+-   [`liftOver` from different genome releases](#liftover-from-different-genome-releases)
 -   [`Rsamtools`](#rsamtools)
     -   [Input BAM into R](#input-bam-into-r)
     -   [Compute number of reads that falls within 100bp bins](#compute-number-of-reads-that-falls-within-100bp-bins)
@@ -131,7 +136,9 @@ Figure 1 is a simple way of plotting ranges stored into *Granges* object using *
 +     length(genes)))
 > ggplot(data = gr, aes(xmin = start, xmax = end, ymin = 0, 
 +     ymax = 1)) + geom_rect(aes(fill = rangeID), alpha = 0.4) + 
-+     facet_wrap(~Sample + seqnames) + theme_bw()
++     facet_wrap(~Sample + seqnames) + theme_bw() + labs(x = "Genomic position", 
++     y = "Ranges") + theme(axis.ticks.y = element_blank(), 
++     axis.text.y = element_blank())
 ```
 
 ![Graphic representation of the GRanges objects created above.](combine_tutorial_2017_files/figure-markdown_github/unnamed-chunk-6-1.png)
@@ -167,11 +174,11 @@ Overlaps between two `GRanges` objects
 
     ## [1] 4
 
-One can also decide to keep every range distinct and evaluate the overlap for each of them. For this analysis we will keep the overlapping ranges as disticnt regions.
+One can also decide to keep every range distinct and evaluate the overlap for each one of them. For this analysis we will keep the overlapping ranges as disticnt regions.
 
--   `findOverlaps()`
+### `findOverlaps()`
 
-By default looks for overlaps starting from 1bp between a `query` and a `subject`.
+By default looks for overlaps of a minimum of 1bp between a `query` and a `subject`.
 
 ``` r
 > `?`(GenomicRanges::findOverlaps)
@@ -279,7 +286,7 @@ By default looks for overlaps starting from 1bp between a `query` and a `subject
     ##   -------
     ##   queryLength: 5 / subjectLength: 4
 
--   `countOverlaps()`
+### `countOverlaps()`
 
 ``` r
 > `?`(GenomicRanges::countOverlaps)
@@ -301,7 +308,7 @@ By default looks for overlaps starting from 1bp between a `query` and a `subject
 Nearest-methods in `GenomicRanges`
 ----------------------------------
 
--   `nearest()`
+### `nearest()`
 
 ``` r
 > `?`(GenomicRanges::nearest)
@@ -343,7 +350,7 @@ It returns a vector of indeces referring to the nearest neighbour range in *subj
 
     ## [1] 1 1 3 4 5
 
--   `distance()`
+### `distance()`
 
 ``` r
 > `?`(GenomicRanges::distance)
@@ -369,7 +376,7 @@ It returns a vector of indeces referring to the nearest neighbour range in *subj
 
 `distance()` is a symmetric function which means that it requires x and y to have to have the same lenght and if one is shorter than the other one it will be recycled to match the length of the longest. Also, the distance between two consecutive blocks is 0 not 1 which affects the notion of overlaps. If `distance(x, y) == 0` then x and y can be either adjacent or overlapping ranges.
 
--   `distanceToNearest()`
+### `distanceToNearest()`
 
 ``` r
 > `?`(GenomicRanges::distanceToNearest)
@@ -665,11 +672,11 @@ In many cases *GRanges* objects can be subsetted using the same rules that apply
     ## GRanges object with 5 ranges and 1 metadata column:
     ##          seqnames    ranges strand | NumberReads
     ##             <Rle> <IRanges>  <Rle> |   <integer>
-    ##   Peak_1     chr1  [ 5, 11]      * |          42
-    ##   Peak_2     chr1  [ 8, 15]      * |          52
-    ##   Peak_3     chr1  [20, 26]      * |          44
-    ##   Peak_4     chr2  [ 8, 16]      * |          41
-    ##   Peak_5     chr2  [18, 21]      * |          48
+    ##   Peak_1     chr1  [ 5, 11]      * |          57
+    ##   Peak_2     chr1  [ 8, 15]      * |          50
+    ##   Peak_3     chr1  [20, 26]      * |          56
+    ##   Peak_4     chr2  [ 8, 16]      * |          47
+    ##   Peak_5     chr2  [18, 21]      * |          50
     ##   -------
     ##   seqinfo: 3 sequences from an unspecified genome; no seqlengths
 
@@ -682,11 +689,11 @@ In many cases *GRanges* objects can be subsetted using the same rules that apply
     ## GRanges object with 5 ranges and 1 metadata column:
     ##          seqnames    ranges strand | NumberReads
     ##             <Rle> <IRanges>  <Rle> |   <integer>
-    ##   Peak_1     chr1  [ 5, 11]      * |          42
-    ##   Peak_2     chr1  [ 8, 15]      * |          52
-    ##   Peak_3     chr1  [20, 26]      * |          44
-    ##   Peak_4     chr2  [ 8, 16]      * |          41
-    ##   Peak_5     chr2  [18, 21]      * |          48
+    ##   Peak_1     chr1  [ 5, 11]      * |          57
+    ##   Peak_2     chr1  [ 8, 15]      * |          50
+    ##   Peak_3     chr1  [20, 26]      * |          56
+    ##   Peak_4     chr2  [ 8, 16]      * |          47
+    ##   Peak_5     chr2  [18, 21]      * |          50
     ## 
     ## -------
     ## seqinfo: 3 sequences from an unspecified genome; no seqlengths
@@ -701,11 +708,11 @@ In many cases *GRanges* objects can be subsetted using the same rules that apply
     ## GRanges object with 5 ranges and 1 metadata column:
     ##          seqnames    ranges strand | NumberReads
     ##             <Rle> <IRanges>  <Rle> |   <integer>
-    ##   Peak_1     chr1  [ 5, 11]      * |          42
-    ##   Peak_2     chr1  [ 8, 15]      * |          52
-    ##   Peak_3     chr1  [20, 26]      * |          44
-    ##   Peak_4     chr2  [ 8, 16]      * |          41
-    ##   Peak_5     chr2  [18, 21]      * |          48
+    ##   Peak_1     chr1  [ 5, 11]      * |          57
+    ##   Peak_2     chr1  [ 8, 15]      * |          50
+    ##   Peak_3     chr1  [20, 26]      * |          56
+    ##   Peak_4     chr2  [ 8, 16]      * |          47
+    ##   Peak_5     chr2  [18, 21]      * |          50
     ## 
     ## -------
     ## seqinfo: 3 sequences from an unspecified genome; no seqlengths
@@ -719,11 +726,11 @@ In many cases *GRanges* objects can be subsetted using the same rules that apply
     ## GRanges object with 5 ranges and 1 metadata column:
     ##          seqnames    ranges strand | NumberReads
     ##             <Rle> <IRanges>  <Rle> |   <integer>
-    ##   Peak_1     chr1  [ 5, 11]      * |          42
-    ##   Peak_2     chr1  [ 8, 15]      * |          52
-    ##   Peak_3     chr1  [20, 26]      * |          44
-    ##   Peak_4     chr2  [ 8, 16]      * |          41
-    ##   Peak_5     chr2  [18, 21]      * |          48
+    ##   Peak_1     chr1  [ 5, 11]      * |          57
+    ##   Peak_2     chr1  [ 8, 15]      * |          50
+    ##   Peak_3     chr1  [20, 26]      * |          56
+    ##   Peak_4     chr2  [ 8, 16]      * |          47
+    ##   Peak_5     chr2  [18, 21]      * |          50
     ## 
     ## -------
     ## seqinfo: 3 sequences from an unspecified genome; no seqlengths
@@ -775,23 +782,23 @@ In many cases *GRanges* objects can be subsetted using the same rules that apply
     ## GRanges object with 26 ranges and 1 metadata column:
     ##          seqnames    ranges strand | NumberReads
     ##             <Rle> <IRanges>  <Rle> |   <integer>
-    ##   Peak_1     chr1  [ 5, 11]      * |          42
-    ##   Peak_2     chr1  [ 8, 15]      * |          52
-    ##   Peak_3     chr1  [20, 26]      * |          44
-    ##   Peak_4     chr2  [ 8, 16]      * |          41
-    ##   Peak_5     chr2  [18, 21]      * |          48
+    ##   Peak_1     chr1  [ 5, 11]      * |          57
+    ##   Peak_2     chr1  [ 8, 15]      * |          50
+    ##   Peak_3     chr1  [20, 26]      * |          56
+    ##   Peak_4     chr2  [ 8, 16]      * |          47
+    ##   Peak_5     chr2  [18, 21]      * |          50
     ##      ...      ...       ...    ... .         ...
-    ##   Peak_4     chr3  [23, 32]      * |          43
-    ##   Peak_5     chr3  [24, 33]      * |          49
-    ##   Peak_6     chr3  [25, 34]      * |          47
-    ##   Peak_7     chr3  [26, 35]      * |          50
-    ##   Peak_8     chr3  [27, 36]      * |          54
+    ##   Peak_4     chr3  [23, 32]      * |          56
+    ##   Peak_5     chr3  [24, 33]      * |          61
+    ##   Peak_6     chr3  [25, 34]      * |          49
+    ##   Peak_7     chr3  [26, 35]      * |          56
+    ##   Peak_8     chr3  [27, 36]      * |          46
     ##   -------
     ##   seqinfo: 3 sequences from an unspecified genome; no seqlengths
 
 Similar considerations apply for the other functions explored above like *findOverlaps()*, *countOverlaps()*, etc...
 
-#### &gt; Challenge
+#### Challenge
 
 > Using the code below to download the `cpg_islands` object containing the CpG islands for the Human chr21 and the `txdb` gene annotation from `TxDb.Hsapiens.UCSC.hg19.knownGene`.
 
@@ -855,7 +862,7 @@ The **GFF** and **GTF** are the preferred format used to store annotations and t
 The function `rtracklayer::import()` is used to import all the supported data types into a `GRanges` object in R. The function recognises the format from the extension of the file but the argument `format` can be used to expliciclty define it. The function `rtracklayer::export()` works in the same way and it is used to export `GRanges` objects to files.
 
 ``` r
-> # Import
+> # Import/Export with Rtrcaklayer
 > rtracklayer::export(chr21, file.path(dir, "transcriptHg19.gff"))
 > rtracklayer::export(chr21, file.path(dir, "transcriptHg19.gtf"))
 > 
@@ -913,9 +920,9 @@ The function `rtracklayer::import()` is used to import all the supported data ty
 > # 1. Create GRanges object made of 20 ranges
 > exampleGR <- GRanges(seqnames = Rle("chr1", 20), IRanges(start = 1:20, 
 +     width = rbinom(20, size = 100, prob = 0.6)))
-> export(exampleGR, "./exampleGR.gff")
+> export(exampleGR, file.path(dir, "exampleGR.gff"))
 > # 2. Read the file back into R.
-> exampleGR_import <- import("./exampleGR.gff")
+> exampleGR_import <- import(file.path(dir, "exampleGR.gff"))
 > # 3. Print the number of rows of the `GRanges`
 > # object just imported and create a histogram of
 > # the widths of the ranges.
@@ -1032,8 +1039,8 @@ The `import` functions allows to load into a R only a specific regions defined u
 +     which = which_region)
 ```
 
-`lifOver` from different genome releases
-========================================
+`liftOver` from different genome releases
+=========================================
 
 ``` r
 > library(AnnotationHub)

@@ -90,7 +90,8 @@ gr <- as.data.frame(rbind(as.data.frame(gr_S1), as.data.frame(genes)))
 gr$rangeID <- c(names(gr_S1),names(genes))
 gr$Sample <- c(rep("Peaks",length(gr_S1)), rep("Genes",length(genes)))
 ggplot(data = gr, aes(xmin = start, xmax = end, ymin = 0, ymax = 1)) + 
-  geom_rect( aes(fill = rangeID),alpha = 0.4) + facet_wrap(~ Sample + seqnames) + theme_bw()
+  geom_rect( aes(fill = rangeID),alpha = 0.4) + facet_wrap(~ Sample + seqnames) + theme_bw() +
+  labs(x = "Genomic position", y = "Ranges") +theme(axis.ticks.y=element_blank(),axis.text.y = element_blank())
 ```
 
 \clearpage
@@ -105,11 +106,11 @@ length(gr_S1)
 length(gr_S1_reduced)
 ```
 
-One can also decide to keep every range distinct and evaluate the overlap for each of them. For this analysis we will keep the overlapping ranges as disticnt regions.
+One can also decide to keep every range distinct and evaluate the overlap for each one of them. For this analysis we will keep the overlapping ranges as disticnt regions.
 
-- `findOverlaps()` 
+### `findOverlaps()` 
 
-By default looks for overlaps starting from 1bp between a `query` and a `subject`.
+By default looks for overlaps of a minimum of 1bp between a `query` and a `subject`.
 
 ```{r}
 ?GenomicRanges::findOverlaps
@@ -137,7 +138,7 @@ overlaps <- findOverlaps(gr_S1,genes, type = "within")
 overlaps
 ```
 
-- `countOverlaps()`
+### `countOverlaps()`
 
 ```{r}
 ?GenomicRanges::countOverlaps
@@ -152,7 +153,7 @@ N_overlaps
 
 ## Nearest-methods in `GenomicRanges`
 
-- `nearest()`
+### `nearest()`
 
 ```{r}
 ?GenomicRanges::nearest
@@ -168,7 +169,7 @@ GenomicRanges::nearest(gr_S1)
 GenomicRanges::nearest(gr_S1,gr_S1)
 ```
 
-- `distance()`
+### `distance()`
 
 ```{r}
 ?GenomicRanges::distance
@@ -182,7 +183,7 @@ GenomicRanges::distance(x = gr_S1, y = genes)
 
 `distance()` is a symmetric function which means that it requires x and y to have to have the same lenght and if one is shorter than the other one it will be recycled to match the length of the longest. Also, the distance between two consecutive blocks is 0 not 1 which affects the notion of overlaps. If `distance(x, y) == 0` then x and y can be either adjacent or overlapping ranges.
 
-- `distanceToNearest()`
+### `distanceToNearest()`
 
 ```{r}
 ?GenomicRanges::distanceToNearest
@@ -318,7 +319,7 @@ Reduce(c,addCols)
 
 Similar considerations apply for the other functions explored above like *findOverlaps()*, *countOverlaps()*, etc...
 
-#### > Challenge
+#### Challenge
 
 > Using the code below to download the `cpg_islands` object containing the CpG islands for the Human chr21 and the `txdb` gene annotation from `TxDb.Hsapiens.UCSC.hg19.knownGene`. 
 
@@ -385,7 +386,7 @@ class(importHg19)
 importHg19
 ```
 
-#### > Challenge
+#### Challenge
 
 > 1. Create a simple `GRanges` object made out of 20 ranges and export it as a `gff` file. 
 > 2. Read the file back into R.
@@ -396,9 +397,9 @@ importHg19
 ```{r}
 # 1. Create  GRanges object made of 20 ranges
 exampleGR <- GRanges(seqnames = Rle("chr1",20), IRanges(start = 1:20, width = rbinom(20,size = 100, prob = 0.6)))
-export(exampleGR, "./exampleGR.gff")
+export(exampleGR, file.path(dir,"exampleGR.gff"))
 # 2. Read the file back into R.
-exampleGR_import <- import("./exampleGR.gff")
+exampleGR_import <- import(file.path(dir,"exampleGR.gff"))
 # 3. Print the number of rows of the `GRanges` object just imported and create a histogram of the widths of the ranges.
 length(exampleGR_import)
 hist(width(exampleGR_import))
@@ -468,7 +469,7 @@ which_region <- GRanges(seqnames = "chr3", IRanges(start = 1, end = 500000))
 import_bigwig_region <- rtracklayer::import(con = bigwig_path, which = which_region)
 ```
 
-# `lifOver` from different genome releases
+# `liftOver` from different genome releases
 
 ```{r}
 library(AnnotationHub)
@@ -560,7 +561,7 @@ values(binned_counts) <- data.frame(ReadCounts = bin_sum)
 ```
 
 
-#### > Challenge
+#### Challenge
 
 > 1. Define a new `ScanBamParam()` object that satisfies the following options:  use the same ranges as above, load both main alignments and PCR duplicates, properly paired and uniquely mapped reads.  
 > 2. Plot an histogram of the fragment sizes of every read (Suggestion: look for the `isize` fields)
